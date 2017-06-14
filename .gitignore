@@ -1,0 +1,114 @@
+package com.api.rest;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
+import java.util.Date;
+
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.WebApplicationException;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
+import com.sun.jersey.core.header.FormDataContentDisposition;
+import com.sun.jersey.multipart.FormDataParam;
+
+@Path("/file")
+public class UploadFileService {
+
+	@POST
+	@Path("/upload")
+	@Consumes(MediaType.MULTIPART_FORM_DATA)
+	public Response uploadPdfFile(@FormDataParam("file") InputStream fileInputStream,
+			@FormDataParam("file") FormDataContentDisposition fileMetaData) throws Exception {
+		String UPLOAD_PATH = getPath() + File.separatorChar +"".replace("\\", "/");
+		String type = fileMetaData.getFileName().substring(fileMetaData.getFileName().lastIndexOf(".") + 1);
+		String id = null;
+		try {
+			int read = 0;
+			byte[] bytes = new byte[1024];
+			OutputStream out = new FileOutputStream(new File(UPLOAD_PATH + fileMetaData.getFileName()));
+			while ((read = fileInputStream.read(bytes)) != -1) {
+				out.write(bytes, 0, read);
+			}
+			out.flush();
+			out.close();
+			id = writeToExcel(type, UPLOAD_PATH + fileMetaData.getFileName(), new Date().toString());
+		} catch (IOException e) {
+			throw new WebApplicationException();
+		}
+		return Response.ok("Data uploaded successfully !! with id "+id).build();
+	}
+
+	
+	public synchronized String writeToExcel(String typeData, String pathData, String createdDate) throws IOException {
+		String FILE_NAME = "C://Users//User//Desktop/details.xlsx";
+		// XSSFWorkbook workbook = new XSSFWorkbook();
+		InputStream myxls = null;
+		try {
+			myxls = new FileInputStream(FILE_NAME);
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		Workbook book = new XSSFWorkbook(myxls);
+		Sheet sheet = book.getSheetAt(0);
+		int rowNum = sheet.getLastRowNum() + 1;
+		Row row = sheet.createRow(rowNum++);
+		String id = getFileId();
+		Cell idCell = row.createCell(0);
+		idCell.setCellValue(id);
+		Cell type = row.createCell(1);
+		type.setCellValue((String) typeData);
+		Cell path = row.createCell(2);
+		path.setCellValue((String) pathData);
+		Cell cellCreatedDate = row.createCell(4);
+		cellCreatedDate.setCellValue((String) createdDate);
+		FileOutputStream out = new FileOutputStream(FILE_NAME);
+		book.write(out);
+		book.close();
+		myxls.close();
+		return id;
+	}
+
+	private synchronized String getFileId() {
+		long id = System.currentTimeMillis();
+		//System.out.println(id+"");
+		return id+"";
+	}
+
+	public String getPath() throws UnsupportedEncodingException {
+		String path = this.getClass().getClassLoader().getResource("").getPath();
+		String fullPath = URLDecoder.decode(path, "UTF-8");
+		String pathArr[] = fullPath.split("/WEB-INF/classes/");
+		fullPath = pathArr[0];
+		String reponsePath = "";
+		// to read a file from webcontent
+		reponsePath = new File(fullPath).getPath() + File.separatorChar + "upload";
+		File file = new File(reponsePath);
+		boolean isExist = false;
+		if (!file.exists()) {
+			isExist = file.mkdirs();
+		}
+		if (isExist)
+			System.out.println("Directory successfully created");
+		else
+			System.out.println("Directory already exist");
+		return reponsePath;
+	}
+
+}
